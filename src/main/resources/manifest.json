@@ -1,0 +1,12 @@
+{
+  "Group": "durkz",
+  "Name": "RestockAndRoam",
+  "Version": "1.0.0",
+  "Description": "Restock & Roam: store expedition loot and restore your equipment and supplies at your base.",
+  "Authors": [{ "Name": "DurkzPRG" }],
+  "Main": "com.durkz.expeditionprep.ExpeditionPrepPlugin",
+  "ServerVersion": ">=0.6.0",
+  "IncludesAssetPack": true,
+  "OptionalDependencies": { "durkz:BetterClaim": "*" },
+  "DisabledByDefault": false
+}

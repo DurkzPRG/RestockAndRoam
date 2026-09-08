@@ -1,0 +1,29 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Durkz_Expedition_Ledger.name",
+    "Description": "server.items.Durkz_Expedition_Ledger.description"
+  },
+  "Categories": ["Items.Tools"],
+  "Quality": "Common",
+  "MaxStack": 1,
+  "Model": "Items/Tools/RestockAndRoam/ExpeditionLedger.blockymodel",
+  "Texture": "Items/Tools/RestockAndRoam/ExpeditionLedger_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Durkz_Expedition_Ledger.png",
+  "IconProperties": {
+    "Scale": 0.745,
+    "Translation": [-7.8, -7.8],
+    "Rotation": [45, 90, 0]
+  },
+  "Scale": 1.2,
+  "PlayerAnimationsId": "Spellbook",
+  "DroppedItemAnimation": "Items/Animations/Dropped/Dropped_Diagonal_Left.blockyanim",
+  "ItemSoundSetId": "ISS_Weapons_Books",
+  "Interactions": {
+    "Secondary": {
+      "Interactions": [{
+        "Type": "OpenCustomUI",
+        "Page": { "Id": "Durkz_ExpeditionLedger" }
+      }]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+$C = "../Common.ui";
+
+@ProfileStyle = TextButtonStyle(
+  Default: (Background: PatchStyle(Color: #243a42), LabelStyle: (FontSize: 13, TextColor: #dcebe4, VerticalAlignment: Center, Wrap: true)),
+  Hovered: (Background: PatchStyle(Color: #36545b), LabelStyle: (FontSize: 13, TextColor: #ffffff, VerticalAlignment: Center, Wrap: true)),
+  Pressed: (Background: PatchStyle(Color: #20352f), LabelStyle: (FontSize: 13, TextColor: #ffffff, VerticalAlignment: Center, Wrap: true)),
+  Sounds: $C.@ButtonSounds
+);
+Group {
+  LayoutMode: Top;
+  Anchor: (Height: 56);
+  TextButton #Pick { Style: @ProfileStyle; Anchor: (Height: 50); Padding: (Left: 10, Right: 6); }
+}

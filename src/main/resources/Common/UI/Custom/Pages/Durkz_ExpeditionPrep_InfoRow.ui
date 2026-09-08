@@ -1,0 +1,9 @@
+Group {
+ LayoutMode: Top;
+ Anchor: (Height: 42);
+ Padding: (Left: 10, Right: 10);
+ Label #Text {
+  Style: (FontSize: 14, TextColor: #dcebe4, VerticalAlignment: Center, Wrap: true);
+  Anchor: (Height: 40);
+ }
+}

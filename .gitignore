@@ -1,0 +1,42 @@
+# Build output
+.gradle/
+build/
+out/
+bin/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local Hytale servers, worlds, logs, and telemetry
+run/
+run-*/
+logs/
+telemetry/
+*.log
+*.log.*
+*.bak
+
+# Local dependencies
+libs/
+
+# Local scripts
+/tools/
+
+# IDE and agent files
+.idea/
+.vscode/
+.cursor/
+.codex/
+*.iml
+AGENTS.md
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+secrets/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini

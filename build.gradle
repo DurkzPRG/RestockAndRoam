@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.durkz'
+version = providers.gradleProperty('mod_version').get()
+
+repositories { mavenCentral() }
+
+def hytaleHome = providers.gradleProperty('hytale_home').getOrElse("${System.getProperty('user.home')}/AppData/Roaming/Hytale")
+def serverJar = file("${hytaleHome}/install/${patchline}/package/game/latest/Server/HytaleServer.jar")
+if (!serverJar.isFile()) {
+    throw new GradleException("HytaleServer.jar missing: ${serverJar}")
+}
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(25) }
+
+dependencies {
+    compileOnly files(serverJar)
+    testImplementation files(serverJar)
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'java.util.logging.manager', 'com.hypixel.hytale.logger.backend.HytaleLogManager'
+}
+tasks.named('jar') { archiveFileName = "RestockAndRoam-${version}.jar" }

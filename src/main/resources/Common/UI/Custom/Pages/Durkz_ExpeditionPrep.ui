@@ -1,0 +1,101 @@
+$C = "../Common.ui";
+
+@ActionStyle = TextButtonStyle(
+  Default: (Background: PatchStyle(Color: #29453f), LabelStyle: (FontSize: 13, TextColor: #d9ede5, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+  Hovered: (Background: PatchStyle(Color: #3c6258), LabelStyle: (FontSize: 13, TextColor: #ffffff, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+  Pressed: (Background: PatchStyle(Color: #20352f), LabelStyle: (FontSize: 13, TextColor: #ffffff, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+  Sounds: $C.@ButtonSounds
+);
+
+$C.@PageOverlay {
+  $C.@DecoratedContainer {
+    Anchor: (Width: 900, Height: 650);
+    #Title {
+      Group {
+        $C.@Title { @Text = "Restock & Roam"; }
+      }
+    }
+    #Content {
+      LayoutMode: Top;
+      Padding: (Full: 18);
+
+      Label {
+        Text: "1. Put supplies in your hotbar   2. Save a profile   3. Link a chest   4. Prepare";
+        Style: (FontSize: 13, TextColor: #a9bdb4, Wrap: true);
+        Anchor: (Height: 30, Bottom: 8);
+      }
+      Label #Depot {
+        Style: (FontSize: 14, TextColor: #dbbf87);
+        Anchor: (Height: 25, Bottom: 10);
+      }
+      Group {
+        LayoutMode: Left;
+        FlexWeight: 1;
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 235, Right: 14);
+          Label {
+            Text: "YOUR PROFILES";
+            Style: (FontSize: 14, TextColor: #dfebe5, RenderBold: true);
+            Anchor: (Height: 28);
+          }
+          Group {
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Background: #121d1c;
+            FlexWeight: 1;
+            Group #Profiles { LayoutMode: Top; Padding: (Full: 6); }
+          }
+          Label {
+            Text: "New profile name";
+            Style: (FontSize: 12, TextColor: #a9bdb4);
+            Anchor: (Height: 24, Top: 10);
+          }
+          $C.@TextField #Name {
+            Anchor: (Height: 32, Bottom: 8);
+            Style: (FontSize: 14, TextColor: #ffffff);
+          }
+          TextButton #Save { Text: "Save hotbar as new"; Style: @ActionStyle; Anchor: (Height: 34); }
+        }
+        Group {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Label #Selected {
+            Style: (FontSize: 18, TextColor: #dfebe5, RenderBold: true);
+            Anchor: (Height: 28);
+          }
+          Group {
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Background: #121d1c;
+            FlexWeight: 1;
+            Group #Items { LayoutMode: Top; Padding: (Full: 8); }
+          }
+          Label {
+            Text: "Matches item type, quality and custom data. Keeps excess items. Does not rearrange equipment or repair tools.";
+            Style: (FontSize: 12, TextColor: #a9bdb4, Wrap: true);
+            Anchor: (Height: 45, Top: 8);
+          }
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 32);
+            TextButton #Replace { Text: "Replace from hotbar"; Style: @ActionStyle; FlexWeight: 1; Anchor: (Right: 6); }
+            TextButton #Delete { Text: "Delete profile"; Style: @ActionStyle; Anchor: (Width: 130); }
+          }
+        }
+      }
+      Label #Status {
+        Style: (FontSize: 13, TextColor: #dbbf87, Wrap: true);
+        Anchor: (Height: 60, Top: 12);
+      }
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 38);
+        TextButton #Link { Text: "Link depot"; Style: @ActionStyle; Anchor: (Width: 150, Right: 8); }
+        TextButton #Prepare { Text: "Prepare"; Style: @ActionStyle; FlexWeight: 1; Anchor: (Right: 8); }
+        TextButton #Refresh { Text: "Refresh"; Style: @ActionStyle; Anchor: (Width: 110, Right: 8); }
+        TextButton #Close { Text: "Close"; Style: @ActionStyle; Anchor: (Width: 100); }
+      }
+    }
+  }
+}

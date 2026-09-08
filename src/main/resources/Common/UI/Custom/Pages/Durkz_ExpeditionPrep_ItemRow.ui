@@ -1,0 +1,13 @@
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 62, Bottom: 4);
+  Background: #1c2b28;
+  Padding: (Full: 6);
+  ItemPreviewComponent #Item { Anchor: (Width: 48, Height: 48, Right: 10); ItemScale: 0.8; }
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+    Label #Label { Style: (FontSize: 14, TextColor: #e4eee8); Anchor: (Height: 24); }
+    Label #Count { Style: (FontSize: 12, TextColor: #a8c3b6); Anchor: (Height: 22); }
+  }
+}

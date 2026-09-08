@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jar binary
+*.blockymodel text eol=lf
+*.ui text eol=lf

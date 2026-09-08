@@ -1,0 +1,13 @@
+$C = "../Common.ui";
+@KitStyle = TextButtonStyle(
+ Default: (Background: PatchStyle(Color: #243a42), LabelStyle: (FontSize: 13, TextColor: #dcebe4, VerticalAlignment: Center, Wrap: true)),
+ Hovered: (Background: PatchStyle(Color: #36545b), LabelStyle: (FontSize: 13, TextColor: #ffffff, VerticalAlignment: Center, Wrap: true)),
+ Pressed: (Background: PatchStyle(Color: #20352f), LabelStyle: (FontSize: 13, TextColor: #ffffff, VerticalAlignment: Center, Wrap: true)),
+ Sounds: $C.@ButtonSounds
+);
+Group {
+ LayoutMode: Left;
+ Anchor: (Height: 56);
+ ItemPreviewComponent #Item { Anchor: (Width: 44, Height: 44, Right: 8); }
+ TextButton #Pick { Style: @KitStyle; FlexWeight: 1; Anchor: (Height: 50); Padding: (Left: 10, Right: 6); }
+}

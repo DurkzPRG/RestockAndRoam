@@ -1,0 +1,122 @@
+$C = "../Common.ui";
+@ActionStyle = TextButtonStyle(
+ Default: (Background: PatchStyle(Color: #263b42), LabelStyle: (FontSize: 13, TextColor: #dbe9e8, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Hovered: (Background: PatchStyle(Color: #37545d), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Pressed: (Background: PatchStyle(Color: #192c2b), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Sounds: $C.@ButtonSounds
+);
+@PrimaryStyle = TextButtonStyle(
+ Default: (Background: PatchStyle(Color: #72603a), LabelStyle: (FontSize: 13, TextColor: #fff0c9, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Hovered: (Background: PatchStyle(Color: #917c49), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Pressed: (Background: PatchStyle(Color: #192c2b), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Sounds: $C.@ButtonSounds
+);
+@DangerStyle = TextButtonStyle(
+ Default: (Background: PatchStyle(Color: #452e34), LabelStyle: (FontSize: 13, TextColor: #efb8b5, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Hovered: (Background: PatchStyle(Color: #653b42), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Pressed: (Background: PatchStyle(Color: #192c2b), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Sounds: $C.@ButtonSounds
+);
+@SelectedStyle = TextButtonStyle(
+ Default: (Background: PatchStyle(Color: #35564c), LabelStyle: (FontSize: 13, TextColor: #f2deb1, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Hovered: (Background: PatchStyle(Color: #426b5d), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Pressed: (Background: PatchStyle(Color: #192c2b), LabelStyle: (FontSize: 13, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center)),
+ Sounds: $C.@ButtonSounds
+);
+$C.@PageOverlay {
+ $C.@DecoratedContainer {
+  Anchor: (Width: 1040, Height: 720);
+  #Title { Group { $C.@Title { @Text = "Restock & Roam"; } } }
+  #Content {
+   LayoutMode: Top;
+   Padding: (Full: 16);
+   Group {
+    LayoutMode: Left;
+    FlexWeight: 1;
+    Group {
+     LayoutMode: Top;
+     Anchor: (Width: 150, Right: 14);
+     Background: #142229;
+     Padding: (Full: 10);
+     Label { Text: "EXPEDITION LEDGER"; Style: (FontSize: 11, TextColor: #c8ad72, RenderBold: true); Anchor: (Height: 32); }
+     TextButton #HUB { Text: "Overview"; Style: @ActionStyle; Anchor: (Height: 42, Bottom: 6); }
+     TextButton #PROFILES { Text: "Kits"; Style: @ActionStyle; Anchor: (Height: 42, Bottom: 6); }
+     TextButton #NETWORK { Text: "Base"; Style: @ActionStyle; Anchor: (Height: 42, Bottom: 6); }
+     TextButton #RULES { Text: "Chest rules"; Style: @SelectedStyle; Anchor: (Height: 42, Bottom: 6); }
+     TextButton #TRIP { Text: "Trip status"; Style: @ActionStyle; Anchor: (Height: 42, Bottom: 6); }
+     Group { FlexWeight: 1; }
+     Label { Text: "Pack once. Roam again."; Style: (FontSize: 14, TextColor: #95b3ab, Wrap: true); Anchor: (Height: 54); }
+     TextButton #Close { Text: "Close"; Style: @ActionStyle; Anchor: (Height: 34); }
+    }
+    Group {
+     LayoutMode: Top;
+     FlexWeight: 1;
+     Label #Heading { Style: (FontSize: 23, TextColor: #f0e3c8, RenderBold: true); Anchor: (Height: 34); }
+     Label #Context { Style: (FontSize: 12, TextColor: #a7c5bb, Wrap: true); Anchor: (Height: 38); }
+     Label #Help { Style: (FontSize: 13, TextColor: #a7b8bf, Wrap: true); Anchor: (Height: 70); }
+     Group {
+      LayoutMode: Left;
+      FlexWeight: 1;
+      Group {
+       LayoutMode: Top;
+       FlexWeight: 1;
+       Anchor: (Right: 12);
+       Group #ProfileChoicesGroup {
+        LayoutMode: Top;
+        Anchor: (Height: 136, Bottom: 10);
+        Background: #182b30;
+        Padding: (Full: 10);
+        Label { Text: "CHOOSE YOUR KIT"; Style: (FontSize: 11, TextColor: #c8ad72, RenderBold: true); Anchor: (Height: 22); }
+        Group { LayoutMode: TopScrolling; ScrollbarStyle: $C.@DefaultScrollbarStyle; FlexWeight: 1;
+         Group #ProfileChoices { LayoutMode: Top; }
+        }
+       }
+       Group {
+        LayoutMode: Top;
+        Background: #13232b;
+        FlexWeight: 1;
+        Padding: (Full: 10);
+        Label { Text: "STORAGE ROUTING"; Style: (FontSize: 11, TextColor: #c8ad72, RenderBold: true); Anchor: (Height: 26); }
+        Group {
+         LayoutMode: TopScrolling;
+         ScrollbarStyle: $C.@DefaultScrollbarStyle;
+         FlexWeight: 1;
+         Group #Rows { LayoutMode: Top; }
+        }
+       }
+      }
+      Group {
+       LayoutMode: Top;
+       Anchor: (Width: 240);
+       Background: #1b2a32;
+       Padding: (Full: 12);
+       Label { Text: "MANAGE CHEST RULES"; Style: (FontSize: 11, TextColor: #c8ad72, RenderBold: true); Anchor: (Height: 26); }
+       Group #FirstGroup {
+        LayoutMode: Top; Anchor: (Height: 66, Bottom: 4);
+        Label #FirstLabel { Style: (FontSize: 12, TextColor: #b5c9cb, Wrap: true); Anchor: (Height: 28); }
+        $C.@TextField #First { Anchor: (Height: 32); Style: (FontSize: 13, TextColor: #ffffff); }
+       }
+       Group #SecondGroup {
+        LayoutMode: Top; Anchor: (Height: 66, Bottom: 4);
+        Label #SecondLabel { Style: (FontSize: 12, TextColor: #b5c9cb, Wrap: true); Anchor: (Height: 28); }
+        $C.@TextField #Second { Anchor: (Height: 32); Style: (FontSize: 13, TextColor: #ffffff); }
+       }
+       Group #ThirdGroup {
+        LayoutMode: Top; Anchor: (Height: 66, Bottom: 4);
+        Label #ThirdLabel { Style: (FontSize: 12, TextColor: #b5c9cb, Wrap: true); Anchor: (Height: 28); }
+        $C.@TextField #Third { Anchor: (Height: 32); Style: (FontSize: 13, TextColor: #ffffff); }
+       }
+       TextButton #Button1 { Text: "Action"; Style: @PrimaryStyle; Anchor: (Height: 34, Bottom: 6); }
+       TextButton #Button2 { Text: "Action"; Style: @ActionStyle; Anchor: (Height: 34, Bottom: 6); }
+       TextButton #Button3 { Text: "Action"; Style: @ActionStyle; Anchor: (Height: 34, Bottom: 6); }
+       TextButton #Button4 { Text: "Action"; Style: @ActionStyle; Anchor: (Height: 34, Bottom: 6); }
+       TextButton #Button5 { Text: "Action"; Style: @ActionStyle; Anchor: (Height: 34, Bottom: 6); }
+       TextButton #Button6 { Text: "Action"; Style: @ActionStyle; Anchor: (Height: 34, Bottom: 6); }
+      }
+     }
+    }
+   }
+   Label #Status { Style: (FontSize: 13, TextColor: #dcc28c, Wrap: true); Anchor: (Height: 48, Top: 10); }
+  }
+ }
+}
