@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
 /** Checks the Restock & Roam page for a newer JAR and notifies only operators or explicit admins. */
 public final class ModUpdateChecker {
     private static final ModUpdateChecker INSTANCE = new ModUpdateChecker();
-    private static final String PAGE_URL = "https://durkzprgmods.pages.dev/mods/restock-and-roam";
-    private static final String DOWNLOAD_URL = "https://www.curseforge.com/hytale/mods/restock-and-roam";
+    static final String PAGE_URL = "https://durkzprgmods.pages.dev/mods/restock-and-roam/";
+    static final String DOWNLOAD_URL = "https://www.curseforge.com/hytale/mods/restock-and-roam";
     private static final Pattern JAR_VERSION = Pattern.compile("RestockAndRoam-(\\d+(?:\\.\\d+){1,3})\\.jar");
 
     private final AtomicReference<String> latestVersion = new AtomicReference<>();
@@ -72,12 +72,18 @@ public final class ModUpdateChecker {
     }
 
     public void notifyPlayer(PlayerRef playerRef) {
-        if (stopped || !RestockRoamPermissions.canReceiveUpdateNotice(playerRef)) return;
+        if (stopped || playerRef == null || !RestockRoamPermissions.canReceiveUpdateNotice(playerRef)) return;
         String latest = latestVersion.get();
         if (latest == null || !isNewer(latest, currentVersion) || !notifiedThisSession.add(playerRef.getUuid())) return;
         playerRef.sendMessage(Message.raw("[Restock & Roam] Update available: " + latest
                 + " (running " + currentVersion + ")").color("#FFAA00"));
         playerRef.sendMessage(rainbowLink("Click here to download on CurseForge", DOWNLOAD_URL));
+    }
+
+    static String parseLatestJarVersion(String body) {
+        if (body == null || body.isBlank()) return null;
+        var matcher = JAR_VERSION.matcher(body);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     private void handleResponse(JavaPlugin plugin, HttpResponse<String> response) {
@@ -86,17 +92,11 @@ public final class ModUpdateChecker {
             plugin.getLogger().atWarning().log("Update check HTTP " + response.statusCode());
             return;
         }
-        String body = response.body();
-        if (body == null || body.isBlank()) {
-            plugin.getLogger().atWarning().log("Update check got an empty page.");
-            return;
-        }
-        var matcher = JAR_VERSION.matcher(body);
-        if (!matcher.find()) {
+        String latest = parseLatestJarVersion(response.body());
+        if (latest == null) {
             plugin.getLogger().atWarning().log("Update check could not find RestockAndRoam-*.jar on the mod page.");
             return;
         }
-        String latest = matcher.group(1);
         latestVersion.set(latest);
         if (isNewer(latest, currentVersion)) {
             plugin.getLogger().atInfo().log("Newer Restock & Roam available: " + latest
