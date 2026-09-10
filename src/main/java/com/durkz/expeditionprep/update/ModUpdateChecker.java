@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 public final class ModUpdateChecker {
     private static final ModUpdateChecker INSTANCE = new ModUpdateChecker();
     static final String PAGE_URL = "https://durkzprgmods.pages.dev/mods/restock-and-roam/";
-    static final String DOWNLOAD_URL = "https://www.curseforge.com/hytale/mods/restock-and-roam";
+    static final String DOWNLOAD_URL = "https://www.curseforge.com/hytale/mods/restock-roam";
     private static final Pattern JAR_VERSION = Pattern.compile("RestockAndRoam-(\\d+(?:\\.\\d+){1,3})\\.jar");
 
     private final AtomicReference<String> latestVersion = new AtomicReference<>();

@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ModUpdateCheckerTest {
     @Test void checksCanonicalModPageAndCurseForgeProject() {
         assertEquals("https://durkzprgmods.pages.dev/mods/restock-and-roam/", ModUpdateChecker.PAGE_URL);
-        assertEquals("https://www.curseforge.com/hytale/mods/restock-and-roam", ModUpdateChecker.DOWNLOAD_URL);
+        assertEquals("https://www.curseforge.com/hytale/mods/restock-roam", ModUpdateChecker.DOWNLOAD_URL);
         assertFalse(ModUpdateChecker.DOWNLOAD_URL.contains("/files"));
     }
 
