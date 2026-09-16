@@ -123,7 +123,7 @@ class TurnaroundTest {
         assertNotEquals(Turnaround.Identity.of(a), Turnaround.Identity.of(new ItemStack("Test_Tool", 1)));
     }
     @Test void filteredDestinationsBeatFallbackAndRespectPriority() {
-        var inv = inventory(container(food(1)), container(ore(5)));
+        var inv = inventory(container(food(1)), container(ore(5), null));
         var fallback = container((ItemStack)null); var low = container((ItemStack)null); var high = container((ItemStack)null);
         var lowRule = new Turnaround.Rule(Turnaround.Role.LOOT, 1, List.of("Test_Other"), List.of(), List.of());
         var highRule = new Turnaround.Rule(Turnaround.Role.LOOT, 9, List.of(), List.of(), List.of("Ore"));
@@ -205,5 +205,28 @@ class TurnaroundTest {
         var result = Turnaround.execute(profile,inv,List.of(),null);
         assertEquals(0,result.missing()); assertEquals(5,inv.get(ProfileStore.Section.HOTBAR).getItemStack((short)0).getQuantity());
         assertEquals(5,inv.get(ProfileStore.Section.HOTBAR).getItemStack((short)1).getQuantity());
+    }
+
+    @Test void preflightDoesNotMoveItemsAndCommitUsesThePreparedContainers() {
+        var inv = inventory(container(food(1)), container(ore(5), null));
+        var depot = container(food(10), null);
+        var prepared = Turnaround.prepare(reserve(5), inv, List.of(chest(depot)), null);
+        assertEquals(1, count(inv, food(1)));
+        assertEquals(10, depot.getItemStack((short) 0).getQuantity());
+        var result = prepared.execute();
+        assertEquals(4, result.refilled(), result.toString());
+        assertEquals(5, count(inv, food(1)));
+        assertEquals(6, depot.getItemStack((short) 0).getQuantity());
+    }
+
+    @Test void duplicateReserveTargetsUseUpdatedInventoryCounts() {
+        var target = Turnaround.target(food(5));
+        var profile = new ProfileStore.Profile(List.of(target, target));
+        var inv = inventory(container(food(1)), container((ItemStack) null));
+        var depot = container(food(10));
+        var result = Turnaround.execute(profile, inv, List.of(chest(depot)), null);
+        assertEquals(4, result.refilled());
+        assertEquals(5, count(inv, food(1)));
+        assertEquals(6, depot.getItemStack((short) 0).getQuantity());
     }
 }

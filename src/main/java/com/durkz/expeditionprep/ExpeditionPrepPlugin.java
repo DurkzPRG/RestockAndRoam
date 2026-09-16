@@ -328,7 +328,7 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             if (gesture != null) {
                 var world = store.getExternalData().getWorld();
                 var ref = chunk.getReferenceTo(index);
-                if (System.nanoTime() > gesture.expires() || !ref.equals(gesture.ref()) || !key(world, playerRef).equals(gesture.key())) {
+                if (System.nanoTime() - gesture.expires() > 0 || !ref.equals(gesture.ref()) || !key(world, playerRef).equals(gesture.key())) {
                     gestures.remove(playerRef.getUuid(), gesture);
                 } else {
                     var player = chunk.getComponent(index, Player.getComponentType());
@@ -351,7 +351,7 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             if (action == null) return;
             var ref = chunk.getReferenceTo(index);
             World world = store.getExternalData().getWorld();
-            if (System.nanoTime() > action.expires() || !ref.equals(action.ref())
+            if (System.nanoTime() - action.expires() > 0 || !ref.equals(action.ref())
                     || !key(world, playerRef).equals(action.key())) {
                 if (pending.remove(playerRef.getUuid(), action)) tell(playerRef, "Depot action expired or cancelled after changing world. Open /expedition to retry.");
                 return;
@@ -418,7 +418,10 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
         if (network == null || !network.allows(playerRef.getUuid())) return;
         String name = data.active(playerRef.getUuid(), network.id());
         var profile = profiles.load(key(world, playerRef)).profiles().get(name);
-        if (profile == null) return;
+        if (profile == null) {
+            tell(playerRef, "Active kit is missing. Save or select a kit in /eprep before using this base.");
+            return;
+        }
         var originTrip = trip(playerRef.getUuid());
         if (originTrip != null && !originTrip.world().equals(world.getWorldConfig().getUuid())) {
             tell(playerRef, "Trip belongs to another world. Return to its origin or abandon it in Trip status."); return;
@@ -440,18 +443,28 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
                 if (container == null) { skipped.add("Unavailable chest: " + link.position().coordinates()); continue; }
                 resolved.add(new Turnaround.Chest(container, link.rule(), i));
             }
+            if (resolved.isEmpty()) {
+                tell(playerRef, "No linked chest is accessible. Trip tracking and items were unchanged.");
+                return;
+            }
             var baseline = trip == null ? null : trip.baseline();
+            var prepared = Turnaround.prepare(profile, sections(store, ref), resolved, baseline);
             // Persist an interruption marker before moving anything. Recovery never replays transfers.
             data.trips.put(playerRef.getUuid(), new ExpeditionState.Trip(network.id(), name,
                     baseline == null ? List.of() : baseline, trip == null ? List.of() : trip.pending(),
                     "Operation interrupted. Inspect inventory, then abandon this trip to recover.", List.of(), true));
             persist(world, data);
             player.getWindowManager().closeWindow(ref, chest.getId(), store);
-            var result = Turnaround.execute(profile, sections(store, ref), resolved, baseline);
+            var result = prepared.execute();
             skipped.addAll(result.details());
             data.trips.put(playerRef.getUuid(), new ExpeditionState.Trip(network.id(), name, result.baseline(), result.pending(),
                     result.summary(), skipped, false));
-            persist(world, data);
+            try { persist(world, data); }
+            catch (IOException error) {
+                getLogger().at(Level.WARNING).withCause(error).log("Items moved but trip result could not be saved for %s", playerRef.getUuid());
+                tell(playerRef, "Items moved, but trip tracking could not be saved. Inspect your inventory and Trip status before abandoning the interrupted trip.");
+                return;
+            }
             tell(playerRef, result.summary());
             getLogger().at(Level.INFO).log("Turnaround completed for %s in %s at %s: %s Pending item types: %s",
                     playerRef.getUsername(), world.getName(), interactedPosition.coordinates(),

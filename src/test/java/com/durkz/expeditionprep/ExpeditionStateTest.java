@@ -60,6 +60,15 @@ class ExpeditionStateTest {
         for (int i=0; i<18; i++) many.add(new ExpeditionState.Link(new ProfileStore.Depot(i % 6, 80, i / 6), Turnaround.Rule.fallback()));
         assertThrows(IllegalArgumentException.class, () -> n.withChests(many));
     }
+
+    @Test void distanceUsesThreeDimensionsAndHandlesExtremeCoordinates() {
+        var origin = new ProfileStore.Depot(0, 80, 0);
+        assertTrue(ExpeditionState.near(origin, new ProfileStore.Depot(16, 80, 0)));
+        assertFalse(ExpeditionState.near(origin, new ProfileStore.Depot(16, 81, 0)));
+        assertTrue(ExpeditionState.near(origin, new ProfileStore.Depot(12, 84, 9)));
+        assertFalse(ExpeditionState.near(new ProfileStore.Depot(Integer.MIN_VALUE, 80, 0),
+                new ProfileStore.Depot(Integer.MAX_VALUE, 80, 0)));
+    }
     @Test void guestsKeepSeparateProfilesTripsAndPendingAfterRestart() throws IOException {
         UUID world = UUID.randomUUID(), a = UUID.randomUUID(), b = UUID.randomUUID();
         var n = network(UUID.randomUUID(), Set.of(a,b));

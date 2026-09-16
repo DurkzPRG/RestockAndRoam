@@ -12,7 +12,10 @@ final class OperationGate {
     boolean gesture(UUID player, long now) {
         AtomicBoolean accepted = new AtomicBoolean();
         lastGesture.compute(player, (id, previous) -> {
-            if (previous != null && now - previous < 750_000_000L) return previous;
+            if (previous != null) {
+                long elapsed = now - previous;
+                if (elapsed >= 0 && elapsed < 750_000_000L) return previous;
+            }
             accepted.set(true); return now;
         });
         return accepted.get();

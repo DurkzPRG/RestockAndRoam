@@ -99,6 +99,16 @@ final class Turnaround {
 
     static Result execute(ProfileStore.Profile profile, Map<ProfileStore.Section, ItemContainer> inventory,
                           List<Chest> chests, List<Count> baseline) {
+        return prepare(profile, inventory, chests, baseline).execute();
+    }
+
+    record Prepared(ProfileStore.Profile profile, Map<ProfileStore.Section, ItemContainer> inventory,
+                    List<Chest> chests, List<Count> baseline) {
+        Result execute() { return run(profile, inventory, chests, baseline); }
+    }
+
+    static Prepared prepare(ProfileStore.Profile profile, Map<ProfileStore.Section, ItemContainer> inventory,
+                            List<Chest> chests, List<Count> baseline) {
         // Validate and simulate the complete operation before touching real containers.
         var identities = Collections.newSetFromMap(new IdentityHashMap<ItemContainer, Boolean>());
         identities.addAll(inventory.values());
@@ -115,7 +125,7 @@ final class Turnaround {
         Map<ProfileStore.Section, ItemContainer> clones = new EnumMap<>(ProfileStore.Section.class);
         inventory.forEach((section, container) -> clones.put(section, container.clone()));
         run(profile, clones, unique.stream().map(c -> new Chest(c.container().clone(), c.rule(), c.order())).toList(), baseline);
-        return run(profile, inventory, unique, baseline);
+        return new Prepared(profile, inventory, List.copyOf(unique), baseline);
     }
 
     private static Result run(ProfileStore.Profile profile, Map<ProfileStore.Section, ItemContainer> inventory,
@@ -202,9 +212,11 @@ final class Turnaround {
             if (!ItemStack.isEmpty(equipped) && equipped.getMaxDurability() > 0 && equipped.getDurability() / equipped.getMaxDurability() < .2)
                 details.add("Low durability: " + equipped.getItemId() + " at " + desired.section() + ":" + desired.index());
         }
+        var reserveCounts = counts(inventory.values());
         for (var target : profile.targets()) {
             if (ExpeditionItems.isExcluded(target.itemId())) continue;
-            int need = Math.max(0, target.quantity() - counts(inventory.values()).getOrDefault(Identity.of(target), 0));
+            var identity = Identity.of(target);
+            int need = Math.max(0, target.quantity() - reserveCounts.getOrDefault(identity, 0));
             for (Chest chest : chests) {
                 if (chest.rule().role() == Role.LOOT) continue;
                 for (short slot = 0; need > 0 && slot < chest.container().getCapacity(); slot++) {
@@ -215,6 +227,7 @@ final class Turnaround {
                         if (destination == null) continue;
                         int moved = move(chest.container(), slot, Math.min(need, quantity(chest.container(), slot)), destination, null);
                         need -= moved; refilled += moved;
+                        if (moved > 0) reserveCounts.merge(identity, moved, Math::addExact);
                         if (need == 0) break;
                     }
                 }

@@ -100,7 +100,8 @@ final class ExpeditionState {
         } finally { Files.deleteIfExists(temp); }
     }
     static boolean near(ProfileStore.Depot a, ProfileStore.Depot b) {
-        double x = (double)a.x() - b.x(), y = (double)a.y() - b.y(), z = (double)a.z() - b.z();
+        long x = (long) a.x() - b.x(), y = (long) a.y() - b.y(), z = (long) a.z() - b.z();
+        if (x < -16 || x > 16 || y < -16 || y > 16 || z < -16 || z > 16) return false;
         return x*x + y*y + z*z <= 256;
     }
 }

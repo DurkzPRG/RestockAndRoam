@@ -37,6 +37,14 @@ class AccessAndGateTest {
         assertTrue(gate.gesture(a,750_000_000)); assertFalse(gate.gesture(a,750_000_001));
         gate.disconnect(a); assertTrue(gate.gesture(a,750_000_002));
     }
+
+    @Test void gestureCooldownHandlesNanoTimeWrap() {
+        var gate = new OperationGate(); UUID player = UUID.randomUUID();
+        long first = Long.MAX_VALUE - 100_000_000L;
+        assertTrue(gate.gesture(player, first));
+        assertFalse(gate.gesture(player, first + 200_000_000L));
+        assertTrue(gate.gesture(player, first + 750_000_000L));
+    }
     @Test void concurrentGuestsCannotEnterSameNetworkUntilReleased() throws Exception {
         var gate = new OperationGate(); var network = UUID.randomUUID();
         try (var executor = Executors.newFixedThreadPool(2)) {
