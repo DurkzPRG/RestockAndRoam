@@ -63,7 +63,8 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
         String selector = "#Rows[" + row + "] ";
         ui.set(selector + "#Item.ItemId", target.itemId());
         ui.set(selector + "#Pick.Text", (entry == entryIndex ? "> " : "") + prefix
-                + target.quantity() + " x " + itemName(target.itemId()));
+                + target.quantity() + " x " + itemName(target.itemId())
+                + (ExpeditionItems.isKnown(target.itemId()) ? "" : " | removed by a game update"));
         events.addEventBinding(CustomUIEventBindingType.Activating, selector + "#Pick", EventData.of("Action", "Entry:" + entryIndex));
     }
     private String playerName(UUID id) throws IOException {
@@ -118,7 +119,7 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                             : !profileName.equals(state.active(playerRef.getUuid(), network.id())) ? "Choose a saved kit below, then click Use this kit."
                             : "Ready with '" + profileName + "': crouch and interact with any linked chest. First use prepares your kit; later returns store new loot and refill supplies.";
                     buttons = new String[]{"Use this kit", "Refresh", "Claim Expedition Ledger", "", "", ""};
-                    for (var n : state.networks.values()) if (n.allows(playerRef.getUuid()) || playerRef.hasPermission("expeditionprep.admin"))
+                    for (var n : state.networks.values()) if (n.allows(playerRef.getUuid()) || playerRef.hasPermission(RestockRoamPermissions.ADMIN))
                         row(ui, events, i++, (n.id().equals(networkId) ? "> " : "") + baseName(n)
                                 + " | " + n.chests().size() + " chests | Owner: " + playerName(n.owner()), "Network:" + n.id());
                 }
@@ -169,7 +170,7 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                     help = "A trip belongs to its origin network. Changing the active kit does not change the previous departure snapshot. Abandon only clears tracking and never moves items. Interrupted operations require inspection before abandoning.";
                     first = adminTools ? "Player name (empty = you)" : "";
                     buttons = new String[]{"Abandon trip", adminTools ? "Inspect player" : "", adminTools ? "Reset tracking" : "", "Refresh",
-                            playerRef.hasPermission("expeditionprep.admin") ? (adminTools ? "Hide admin tools" : "Admin tools") : "", ""};
+                            playerRef.hasPermission(RestockRoamPermissions.ADMIN) ? (adminTools ? "Hide admin tools" : "Admin tools") : "", ""};
                     var stored = plugin.trip(inspectPlayer == null ? playerRef.getUuid() : inspectPlayer);
                     var trip = stored == null ? null : stored.trip();
                     if (trip == null) row(ui, events, i++, "No active trip.", "None");
@@ -213,10 +214,15 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
             ui.append("#ProfileChoices", "Pages/Durkz_ExpeditionPrep_ProfileRow.ui");
             String selector = "#ProfileChoices[" + row++ + "] #Pick";
             ui.set(selector + ".Text", (profile.getKey().equals(profileName) ? "> " : "") + profile.getKey()
-                    + (profile.getValue().needsRecapture() ? " (save equipment again)" : ""));
+                    + (profile.getValue().needsRecapture() ? " (save equipment again)"
+                    : hasRemovedItems(profile.getValue()) ? " (has removed items)" : ""));
             events.addEventBinding(CustomUIEventBindingType.Activating, selector,
                     EventData.of("Action", "Profile:" + profile.getKey()));
         }
+    }
+    static boolean hasRemovedItems(ProfileStore.Profile profile) {
+        return profile.slots().stream().anyMatch(s -> !ExpeditionItems.isKnown(s.target().itemId()))
+                || profile.targets().stream().anyMatch(t -> !ExpeditionItems.isKnown(t.itemId()));
     }
     static String chooseProfile(Map<String, ProfileStore.Profile> profiles, String requested, String active) {
         if (requested != null && profiles.containsKey(requested)) return requested;
@@ -271,7 +277,7 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
             case HUB -> {
                 if (button == 1) plugin.activate(world, playerRef, networkId, profileName);
                 if (button == 3) {
-                    status = ExpeditionItems.claimLedger(ExpeditionPrepPlugin.inventory(store, ref));
+                    status = plugin.claimLedger(playerRef, store, ref);
                     return false;
                 }
             }
@@ -297,7 +303,7 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                             ItemStack held = hotbar.getInventory().getItemStack(active);
                             if (ItemStack.isEmpty(held)) throw new IllegalArgumentException("Hold an item in your hotbar.");
                             if (ExpeditionItems.isExcluded(held.getItemId())) throw new IllegalArgumentException("Editor tools and the Expedition Ledger cannot be added to an expedition kit.");
-                            var target = quantity(Turnaround.target(held), Integer.parseInt(input.second.trim()));
+                            var target = quantity(Turnaround.target(held), number(input.second, "Desired quantity", 1, 100_000));
                             reserves.removeIf(t -> Turnaround.Identity.of(t).equals(Turnaround.Identity.of(target)));
                             reserves.add(target);
                         } else {
@@ -305,10 +311,10 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                             if (entry < slots.size()) {
                                 var slot = slots.get(entry);
                                 if (button == 3) slots.remove(entry);
-                                else slots.set(entry, new ProfileStore.Slot(slot.section(), slot.index(), quantity(slot.target(), Integer.parseInt(input.second.trim()))));
+                                else slots.set(entry, new ProfileStore.Slot(slot.section(), slot.index(), quantity(slot.target(), number(input.second, "Desired quantity", 1, 100_000))));
                             } else {
                                 int n = entry - slots.size();
-                                if (button == 3) reserves.remove(n); else reserves.set(n, quantity(reserves.get(n), Integer.parseInt(input.second.trim())));
+                                if (button == 3) reserves.remove(n); else reserves.set(n, quantity(reserves.get(n), number(input.second, "Desired quantity", 1, 100_000)));
                             }
                         }
                         plugin.profiles().save(key, data.withProfile(profileName, new ProfileStore.Profile(reserves, slots, profile.needsRecapture())));
@@ -316,8 +322,8 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                 }
             }
             case NETWORK -> {
-                if (button == 1) { plugin.arm(world, playerRef, store, ref, null); close(); return true; }
-                if (button == 2) { plugin.armAdditional(world, playerRef, store, ref); close(); return true; }
+                if (button == 1) { plugin.armLink(world, playerRef, store, ref, false); close(); return true; }
+                if (button == 2) { plugin.armLink(world, playerRef, store, ref, true); close(); return true; }
                 var network = owner(state);
                 if (button == 3) {
                     if (chestIndex <= 0 || chestIndex >= network.chests().size()) throw new IllegalArgumentException("Select an additional chest. Primary removal requires Delete network.");
@@ -325,13 +331,31 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                     state.networks.put(network.id(), network.withChests(links));
                 } else if (button == 4 || button == 5) {
                     UUID guest = button == 5 && selectedGuest != null ? selectedGuest : playerId(input.first);
+                    if (guest.equals(network.owner())) throw new IllegalArgumentException("The owner already uses this base.");
                     var guests = new HashSet<>(network.guests());
-                    if (button == 4) guests.add(guest); else guests.remove(guest);
+                    if (button == 4) {
+                        if (!guests.add(guest)) throw new IllegalArgumentException(playerName(guest) + " is already a guest.");
+                    } else {
+                        if (!guests.remove(guest)) throw new IllegalArgumentException("Select a guest to remove.");
+                        // A removed guest can no longer reach this base, so their selection and trip here end too.
+                        var selections = state.active.get(guest);
+                        if (selections != null) selections.remove(network.id());
+                        var trip = state.trips.get(guest);
+                        if (trip != null && trip.network().equals(network.id())) state.trips.remove(guest);
+                        selectedGuest = null;
+                    }
                     state.networks.put(network.id(), new ExpeditionState.Network(network.id(), network.owner(), network.chests(), guests));
                 } else if (button == 6) {
                     if (!confirmed("RemoveNetwork:" + network.id())) return false;
                     state.networks.remove(network.id());
                     state.active.values().forEach(m -> m.remove(network.id()));
+                    // Trips only track counts. Dropping them never moves items.
+                    int ended = 0;
+                    for (var it = state.trips.values().iterator(); it.hasNext();)
+                        if (it.next().network().equals(network.id())) { it.remove(); ended++; }
+                    plugin.persist(world, state);
+                    status = "Base deleted. " + (ended == 0 ? "" : ended + " trip(s) on it were cleared. ") + "No items were moved.";
+                    return false;
                 }
                 plugin.persist(world, state);
             }
@@ -341,8 +365,8 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
                 if (chestIndex < 0 || chestIndex >= network.chests().size()) throw new IllegalArgumentException("Select a chest first.");
                 var links = new ArrayList<>(network.chests());
                 if (button == 1) {
-                    var role = Turnaround.Role.valueOf(input.first.trim().toUpperCase(Locale.ROOT));
-                    int priority = Integer.parseInt(input.second.trim());
+                    var role = role(input.first);
+                    int priority = number(input.second, "Priority", -1000, 1000);
                     List<String> items = new ArrayList<>(), categories = new ArrayList<>(), resources = new ArrayList<>();
                     if (!input.third.isBlank()) for (String value : input.third.split(",")) {
                         String[] pair = value.trim().split(":", 2);
@@ -359,19 +383,24 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
             }
             case TRIP -> {
                 if (button == 5) {
-                    if (!playerRef.hasPermission("expeditionprep.admin")) throw new IllegalArgumentException("Requires expeditionprep.admin.");
+                    if (!playerRef.hasPermission(RestockRoamPermissions.ADMIN)) throw new IllegalArgumentException("Requires expeditionprep.admin.");
                     adminTools = !adminTools;
                     if (!adminTools) inspectPlayer = null;
                     break;
                 }
                 if (button == 2 || button == 3) {
-                    if (!playerRef.hasPermission("expeditionprep.admin")) throw new IllegalArgumentException("Requires expeditionprep.admin.");
+                    if (!playerRef.hasPermission(RestockRoamPermissions.ADMIN)) throw new IllegalArgumentException("Requires expeditionprep.admin.");
                     UUID target = input.first.isBlank() ? playerRef.getUuid() : playerId(input.first);
                     if (button == 2) inspectPlayer = target;
-                    else { if (!confirmed("Recover:" + target)) return false; plugin.abandon(target, playerRef); }
+                    else {
+                        if (!confirmed("Recover:" + target)) return false;
+                        status = plugin.abandon(target, playerRef) ? "Tracking reset requested. Items are unchanged. Refresh to check." : "That player has no active trip.";
+                        return false;
+                    }
                 } else if (button == 1) {
                     if (!confirmed("Abandon:" + playerRef.getUuid())) return false;
-                    plugin.abandon(playerRef.getUuid(), playerRef);
+                    status = plugin.abandon(playerRef.getUuid(), playerRef) ? "Tracking reset requested. Your items are unchanged. Refresh to check." : "You have no active trip.";
+                    return false;
                 }
             }
         }
@@ -380,9 +409,20 @@ final class ManagementPage extends InteractiveCustomUIPage<ManagementPage.Input>
             case PROFILES -> button == 6 ? "Kit activated for this base." : button == 5 ? "Kit deleted. Your items were not changed." : "Kit saved. Your items were not moved.";
             case NETWORK -> "Base settings saved.";
             case RULES -> "Chest rules saved / refreshed.";
-            case TRIP -> button == 1 || button == 3 ? "Tracking reset requested. Your items are unchanged. Refresh to check." : "Trip status refreshed.";
+            case TRIP -> "Trip status refreshed.";
         };
         return false;
+    }
+    static int number(String text, String field, int min, int max) {
+        try {
+            int value = Integer.parseInt(text.trim());
+            if (value >= min && value <= max) return value;
+        } catch (NumberFormatException ignored) {}
+        throw new IllegalArgumentException(field + " must be a whole number from " + min + " to " + max + ".");
+    }
+    static Turnaround.Role role(String text) {
+        try { return Turnaround.Role.valueOf(text.trim().toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException error) { throw new IllegalArgumentException("Role must be SUPPLY, LOOT or BOTH."); }
     }
     private static ProfileStore.Target quantity(ProfileStore.Target target, int quantity) {
         return new ProfileStore.Target(target.itemId(), target.metadata(), target.quality(), quantity);

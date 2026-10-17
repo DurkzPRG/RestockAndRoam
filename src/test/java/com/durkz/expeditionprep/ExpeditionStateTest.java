@@ -126,8 +126,8 @@ class ExpeditionStateTest {
         var data = new ExpeditionState.WorldData(); var network = network(player,Set.of()); data.networks.put(network.id(),network);
         data.trips.put(player,new ExpeditionState.Trip(network.id(),"Mining",List.of(),List.of(),"Ready",List.of(),false));
         var store = new ExpeditionState(directory); store.save(origin,data); store.save(other,new ExpeditionState.WorldData());
-        assertEquals(origin,new ExpeditionState(directory).findTrip(player).world());
-        assertEquals(network.id(),new ExpeditionState(directory).findTrip(player).trip().network());
-        assertNull(store.findTrip(UUID.randomUUID()));
+        assertEquals(origin,new ExpeditionState(directory).tripWorlds().get(player));
+        assertEquals(network.id(),new ExpeditionState(directory).load(origin).trips.get(player).network());
+        assertNull(store.tripWorlds().get(UUID.randomUUID()));
     }
 }

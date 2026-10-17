@@ -23,6 +23,14 @@ class LedgerTest {
         assertEquals(1, count);
     }
 
+    @Test void ledgerInAnotherSectionBlocksASecondClaim() {
+        var utility = new SimpleItemContainer((short)1);
+        utility.setItemStackForSlot((short)0, new ItemStack(ExpeditionItems.LEDGER, 1));
+        var inventory = new SimpleItemContainer((short)2);
+        assertTrue(ExpeditionItems.claimLedger(utility, inventory).contains("already have"));
+        assertTrue(inventory.isEmpty());
+    }
+
     @Test void fullInventoryIsKeptAndClaimCanBeRetried() {
         var inventory = new SimpleItemContainer((short)1);
         var food = new ItemStack("Test_Food", 20);

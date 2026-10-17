@@ -49,9 +49,13 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
     private record Gesture(ProfileStore.Key key, Ref<EntityStore> ref, ProfileStore.Depot position, long expires) {}
     private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
     private final Map<UUID, String> reports = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> ledgerClaims = new ConcurrentHashMap<>();
+    // Player to origin world of their trip. Guarded by itself; filled from disk on first use.
+    private final Map<UUID, UUID> tripWorlds = new java.util.HashMap<>();
+    private boolean tripIndexReady;
+    private static final long LEDGER_COOLDOWN = TimeUnit.SECONDS.toNanos(60);
 
-    private record Pending(ProfileStore.Key key, Ref<EntityStore> ref, long expires,
-                           String name, ProfileStore.Profile profile, ProfileStore.Depot depot) {}
+    private record Pending(ProfileStore.Key key, Ref<EntityStore> ref, long expires, boolean additional) {}
 
     public ExpeditionPrepPlugin(JavaPluginInit init) { super(init); }
 
@@ -90,6 +94,7 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             gestures.remove(event.getPlayerRef().getUuid());
             gate.disconnect(event.getPlayerRef().getUuid());
             reports.remove(event.getPlayerRef().getUuid());
+            ledgerClaims.remove(event.getPlayerRef().getUuid());
             com.durkz.expeditionprep.update.ModUpdateChecker.getInstance()
                     .forgetPlayer(event.getPlayerRef().getUuid());
         });
@@ -105,7 +110,8 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
     @Override
     protected void shutdown() {
         com.durkz.expeditionprep.update.ModUpdateChecker.getInstance().shutdown();
-        pending.clear(); reports.clear(); gestures.clear(); states.clear(); gate.clear();
+        pending.clear(); reports.clear(); gestures.clear(); states.clear(); gate.clear(); ledgerClaims.clear();
+        synchronized (tripWorlds) { tripWorlds.clear(); tripIndexReady = false; }
         super.shutdown();
     }
 
@@ -150,18 +156,39 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
     }
 
     void persist(World world, ExpeditionState.WorldData data) throws IOException {
-        try { stateStore.save(world.getWorldConfig().getUuid(), data); }
-        catch (IOException | RuntimeException error) { states.remove(world.getWorldConfig().getUuid()); throw error; }
+        UUID id = world.getWorldConfig().getUuid();
+        try { stateStore.save(id, data); }
+        catch (IOException | RuntimeException error) { states.remove(id); throw error; }
+        indexTrips(id, data);
     }
 
-    ExpeditionState.StoredTrip trip(UUID player) throws IOException { return stateStore.findTrip(player); }
+    private void indexTrips(UUID world, ExpeditionState.WorldData data) {
+        synchronized (tripWorlds) {
+            tripWorlds.entrySet().removeIf(e -> e.getValue().equals(world) && !data.trips.containsKey(e.getKey()));
+            for (UUID player : data.trips.keySet()) tripWorlds.put(player, world);
+        }
+    }
+
+    UUID tripWorld(UUID player) throws IOException {
+        synchronized (tripWorlds) {
+            if (!tripIndexReady) { tripWorlds.putAll(stateStore.tripWorlds()); tripIndexReady = true; }
+            return tripWorlds.get(player);
+        }
+    }
+
+    ExpeditionState.StoredTrip trip(UUID player) throws IOException {
+        UUID world = tripWorld(player);
+        var trip = world == null ? null : stateStore.load(world).trips.get(player);
+        return trip == null ? null : new ExpeditionState.StoredTrip(world, trip);
+    }
     ExpeditionState.WorldData savedState(UUID world) throws IOException { return stateStore.load(world); }
 
-    void abandon(UUID target, PlayerRef requester) throws IOException {
-        if (!target.equals(requester.getUuid()) && !requester.hasPermission("expeditionprep.admin"))
+    /** Returns false when the player has no trip to clear. */
+    boolean abandon(UUID target, PlayerRef requester) throws IOException {
+        if (!target.equals(requester.getUuid()) && !requester.hasPermission(RestockRoamPermissions.ADMIN))
             throw new IllegalArgumentException("Requires expeditionprep.admin.");
         var stored = trip(target);
-        if (stored == null) return;
+        if (stored == null) return false;
         var origin = com.hypixel.hytale.server.core.universe.Universe.get().getWorld(stored.world());
         if (origin != null) {
             origin.execute(() -> {
@@ -175,8 +202,21 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             var data = stateStore.load(stored.world());
             data.trips.remove(target); stateStore.save(stored.world(), data);
             states.remove(stored.world());
+            indexTrips(stored.world(), data);
             tell(requester, "Trip abandoned. No items were moved.");
         }
+        return true;
+    }
+
+    String claimLedger(PlayerRef player, Store<EntityStore> store, Ref<EntityStore> ref) {
+        var owned = InventoryComponent.getCombined(store, ref, InventoryComponent.EVERYTHING);
+        Long last = ledgerClaims.get(player.getUuid());
+        // Owning one is the more useful answer, so the cooldown only speaks when the Ledger is gone.
+        if (last != null && System.nanoTime() - last < LEDGER_COOLDOWN && !ExpeditionItems.hasLedger(owned))
+            return "You claimed a Ledger less than a minute ago. Check your inventory or try again shortly.";
+        String result = ExpeditionItems.claimLedger(owned, inventory(store, ref));
+        if (result.equals(ExpeditionItems.LEDGER_RECEIVED)) ledgerClaims.put(player.getUuid(), System.nanoTime());
+        return result;
     }
 
     void migrate(World world, PlayerRef player) throws IOException {
@@ -227,27 +267,28 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
         tell(player, "Saved full kit as '" + name + "'. Items were not moved.");
     }
 
-    void arm(World world, PlayerRef player, Store<EntityStore> store, Ref<EntityStore> ref,
-             String name) throws IOException {
-        var key = key(world, player);
+    void activateOwnBase(World world, PlayerRef player, String name) throws IOException {
         migrate(world, player);
-        var data = profiles.load(key);
-        var profile = name == null ? null : data.profiles().get(name);
-        if (name != null && profile == null) throw new IllegalArgumentException("Select a saved profile first.");
-        if (name != null && !name.equals("@link")) {
-            var network = state(world).owned(player.getUuid());
-            if (network == null) throw new IllegalArgumentException("Link a primary chest first.");
-            activate(world, player, network.id(), name);
-            return;
-        }
+        var network = state(world).owned(player.getUuid());
+        if (network == null) throw new IllegalArgumentException("Link a primary chest first.");
+        activate(world, player, network.id(), name);
+    }
+
+    void armLink(World world, PlayerRef player, Store<EntityStore> store, Ref<EntityStore> ref,
+                 boolean additional) throws IOException {
+        migrate(world, player);
+        var owned = state(world).owned(player.getUuid());
+        if (additional && owned == null) throw new IllegalArgumentException("Link a primary chest first.");
+        if (!additional && owned != null)
+            throw new IllegalArgumentException("A primary is already linked. Remove the network explicitly before replacing it.");
         Player entity = store.getComponent(ref, Player.getComponentType());
         if (entity == null) return;
         // A new vanilla chest opening must succeed after the request. Never reuse a stale window.
         entity.getWindowManager().closeAllWindows(ref, store);
-        pending.put(player.getUuid(), new Pending(key, ref,
-                System.nanoTime() + TimeUnit.SECONDS.toNanos(30), name, profile, data.depot()));
-        tell(player, name == null ? "Open your depot chest within 30 seconds to link it."
-                : "Open your linked chest at " + data.depot().coordinates() + " within 30 seconds to prepare '" + name + "'.");
+        pending.put(player.getUuid(), new Pending(key(world, player), ref,
+                System.nanoTime() + TimeUnit.SECONDS.toNanos(30), additional));
+        tell(player, additional ? "Open an additional chest within 30 seconds, within 16 blocks of your primary."
+                : "Open your main chest within 30 seconds to link it.");
     }
 
     void cancel(PlayerRef player) {
@@ -282,7 +323,6 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             try {
                 pending.remove(playerRef.getUuid());
                 migrate(world, playerRef);
-                var data = profiles.load(key(world, playerRef));
                 Player player = store.getComponent(ref, Player.getComponentType());
                 if (player != null) player.getPageManager().openCustomPage(ref, store,
                         new ManagementPage(ExpeditionPrepPlugin.this, playerRef, world, ManagementPage.Tab.HUB));
@@ -303,8 +343,8 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             try {
                 switch (getName()) {
                     case "save" -> saveProfile(world, player, store, ref, name.get(ctx), false);
-                    case "bind" -> arm(world, player, store, ref, null);
-                    case "prepare" -> arm(world, player, store, ref, name.get(ctx));
+                    case "bind" -> armLink(world, player, store, ref, false);
+                    case "prepare" -> activateOwnBase(world, player, name.get(ctx));
                     case "cancel" -> cancel(player);
                     default -> throw new IllegalStateException("Unknown expedition command");
                 }
@@ -359,35 +399,14 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             Player player = chunk.getComponent(index, Player.getComponentType());
             for (Window window : player.getWindowManager().getWindows()) {
                 if (!(window instanceof ContainerBlockWindow chest) || !chest.validate(ref, buffer)) continue;
-                var depot = new ProfileStore.Depot(chest.getX(), chest.getY(), chest.getZ());
-                if (action.profile() != null && !depot.equals(action.depot())) continue;
                 if (!pending.remove(playerRef.getUuid(), action)) return;
                 try {
-                    if (action.profile() == null) {
-                        link(world, playerRef, depot, "@link".equals(action.name()));
-                    } else {
-                        List<Supplies.Line> lines = Supplies.prepare(action.profile(), chest.getItemContainer(), inventory(store, ref));
-                        int moved = lines.stream().mapToInt(Supplies.Line::moved).sum();
-                        int missing = lines.stream().mapToInt(Supplies.Line::missing).sum();
-                        tell(playerRef, "'" + action.name() + "': moved " + moved + " items. "
-                                + (missing == 0 ? "Ready to go." : missing + " still missing (chest stock or inventory space)."));
-                        for (var line : lines) {
-                            if (line.missing() > 0) playerRef.sendMessage(Message.raw("Missing " + line.missing() + " x " + line.target().itemId()).color("#edc18b"));
-                        }
-                    }
+                    link(world, playerRef, new ProfileStore.Depot(chest.getX(), chest.getY(), chest.getZ()), action.additional());
                 } catch (IOException e) { failure(playerRef, e); }
                 catch (IllegalArgumentException e) { tell(playerRef, e.getMessage()); }
                 return;
             }
         }
-    }
-
-    void armAdditional(World world, PlayerRef player, Store<EntityStore> store, Ref<EntityStore> ref) throws IOException {
-        if (state(world).owned(player.getUuid()) == null) throw new IllegalArgumentException("Link a primary chest first.");
-        arm(world, player, store, ref, null);
-        var action = pending.get(player.getUuid());
-        pending.put(player.getUuid(), new Pending(action.key(), ref, action.expires(), "@link", null, action.depot()));
-        tell(player, "Open an additional chest within 30 seconds, within 16 blocks of your primary.");
     }
 
     private void link(World world, PlayerRef player, ProfileStore.Depot position, boolean additional) throws IOException {
@@ -397,6 +416,10 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
         var network = data.owned(player.getUuid());
         if (additional) {
             if (network == null) throw new IllegalArgumentException("Link a primary chest first.");
+            if (network.chests().size() >= ExpeditionState.MAX_CHESTS)
+                throw new IllegalArgumentException("A base holds up to " + ExpeditionState.MAX_CHESTS + " chests. Unlink one first.");
+            if (!ExpeditionState.near(network.chests().getFirst().position(), position))
+                throw new IllegalArgumentException("That chest is more than 16 blocks from your primary.");
             var links = new ArrayList<>(network.chests());
             links.add(new ExpeditionState.Link(position, Turnaround.Rule.fallback()));
             network = network.withChests(links);
@@ -422,16 +445,21 @@ public final class ExpeditionPrepPlugin extends JavaPlugin {
             tell(playerRef, "Active kit is missing. Save or select a kit in /eprep before using this base.");
             return;
         }
-        var originTrip = trip(playerRef.getUuid());
-        if (originTrip != null && !originTrip.world().equals(world.getWorldConfig().getUuid())) {
+        var originWorld = tripWorld(playerRef.getUuid());
+        if (originWorld != null && !originWorld.equals(world.getWorldConfig().getUuid())) {
             tell(playerRef, "Trip belongs to another world. Return to its origin or abandon it in Trip status."); return;
         }
         var trip = data.trips.get(playerRef.getUuid());
-        if (trip != null && (!trip.network().equals(network.id()) || trip.interrupted())) {
-            tell(playerRef, "Trip belongs to another network or needs recovery. Open Trip status."); return;
+        if (trip != null && trip.interrupted()) {
+            tell(playerRef, "Your last turnaround was interrupted. Inspect your inventory, then abandon the trip in Trip status."); return;
         }
-        if (!ChestAccess.allowed(playerRef.getUuid(), world, interactedPosition)) return;
-        if (!gate.enter(network.id())) return;
+        if (trip != null && !trip.network().equals(network.id())) {
+            tell(playerRef, "Your trip started at another base. Return there, or abandon it in Trip status."); return;
+        }
+        if (!ChestAccess.allowed(playerRef.getUuid(), world, interactedPosition)) {
+            tell(playerRef, "BetterClaim denies chest access here. Ask the claim owner for chest permission."); return;
+        }
+        if (!gate.enter(network.id())) { tell(playerRef, "Another player is using this base. Try again in a moment."); return; }
         try {
             List<Turnaround.Chest> resolved = new ArrayList<>();
             List<String> skipped = new ArrayList<>();

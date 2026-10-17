@@ -8,6 +8,7 @@ import java.util.*;
 
 /** One atomic document per world, including networks, personal trips and active selections. */
 final class ExpeditionState {
+    static final int MAX_CHESTS = 17;
     record Link(ProfileStore.Depot position, Turnaround.Rule rule) {
         Link { Objects.requireNonNull(position); Objects.requireNonNull(rule); }
     }
@@ -15,7 +16,7 @@ final class ExpeditionState {
         Network {
             Objects.requireNonNull(id); Objects.requireNonNull(owner);
             chests = List.copyOf(chests); guests = Set.copyOf(guests);
-            if (chests.isEmpty() || chests.size() > 17 || guests.size() > 128)
+            if (chests.isEmpty() || chests.size() > MAX_CHESTS || guests.size() > 128)
                 throw new IllegalArgumentException("Invalid network size");
             Set<ProfileStore.Depot> positions = new HashSet<>();
             for (Link chest : chests) if (!positions.add(chest.position()) || !near(chests.getFirst().position(), chest.position()))
@@ -61,19 +62,20 @@ final class ExpeditionState {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     ExpeditionState(Path directory) { this.directory = directory; }
     record StoredTrip(UUID world, Trip trip) {}
-    synchronized StoredTrip findTrip(UUID player) throws IOException {
-        if (!Files.isDirectory(directory)) return null;
+    /** Player to origin world for every saved trip. Read once at startup, then kept current by the plugin. */
+    synchronized Map<UUID, UUID> tripWorlds() throws IOException {
+        Map<UUID, UUID> result = new HashMap<>();
+        if (!Files.isDirectory(directory)) return result;
         // Only state documents, never chunks or container searches.
         try (var files = Files.newDirectoryStream(directory, "*.json")) {
             for (Path file : files) {
                 UUID world;
                 try { world = UUID.fromString(file.getFileName().toString().replace(".json", "")); }
                 catch (IllegalArgumentException error) { throw new IOException("Unexpected state filename: " + file, error); }
-                Trip trip = load(world).trips.get(player);
-                if (trip != null) return new StoredTrip(world, trip);
+                for (UUID player : load(world).trips.keySet()) result.putIfAbsent(player, world);
             }
         }
-        return null;
+        return result;
     }
     synchronized WorldData load(UUID world) throws IOException {
         Path path = directory.resolve(world + ".json");

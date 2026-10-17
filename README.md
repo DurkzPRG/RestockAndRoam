@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="Java 25" src="https://img.shields.io/badge/Java-25-E76F00?logo=openjdk&logoColor=white" />
-  <img alt="Hytale 0.6.0 or newer" src="https://img.shields.io/badge/Hytale-%3E%3D0.6.0-2D6A4F" />
+  <img alt="Hytale 0.7.0 or newer" src="https://img.shields.io/badge/Hytale-%3E%3D0.7.0-2D6A4F" />
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green.svg" /></a>
 </p>
 
@@ -107,7 +107,7 @@ On Windows:
 
 The server JAR is resolved from `%AppData%\Hytale\install\release\package\game\latest\Server\HytaleServer.jar` and is used only as a compile-time dependency. It is never packaged inside the mod.
 
-Build output: `build/libs/RestockAndRoam-1.0.0.jar`
+Build output: `build/libs/RestockAndRoam-1.1.0.jar`
 
 ## Support
 

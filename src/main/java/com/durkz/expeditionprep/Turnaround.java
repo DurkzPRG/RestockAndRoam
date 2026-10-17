@@ -11,9 +11,9 @@ import java.util.*;
 final class Turnaround {
     record Identity(String itemId, int quality, String metadata) {
         static Identity of(ItemStack stack) {
-            var data = stack.getMetadata();
+            var data = Supplies.metadata(stack);
             return new Identity(stack.getItemId(), stack.getQualityIndex(),
-                    data == null || data.isEmpty() ? null : canonical(data).asDocument().toJson());
+                    data == null ? null : canonical(data).asDocument().toJson());
         }
         static Identity of(ProfileStore.Target target) {
             var data = target.metadata() == null ? null : BsonDocument.parse(target.metadata());
